@@ -92,10 +92,10 @@ The prototype's structural and mechanical components were fully designed and ani
 
 | Top-Down View (Base Layout) | Side View (100° Elevation) | Side View (145° Elevation) |
 |:---:|:---:|:---:|
-| <img src="images/top_view.png" width="250" alt="Top-down view"> | <img src="images/elevation_100.png" width="250" alt="100 degrees elevation"> | <img src="images/elevation_145.png" width="250" alt="145 degrees elevation"> |
+| <img src="images/top_view.png" width="250" alt="Top-down view"> | <img src="images/elevation_100.png" width="250" alt="100 degrees elevation"> | <img src="images/elevation_140.png" width="250" alt="145 degrees elevation"> |
 
 ### ⚙️ Mechanism & Actuators
 
 | Full Assembly | Drive System Detail |
-|:---:|:---:|
+|:---:|
 | <img src="images/full_assembly.png" width="300" alt="Full assembly"> | 
