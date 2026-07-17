@@ -18,7 +18,7 @@ It utilizes the following hardware and software components:
 * **Servo Motors** (Actuators for pan/tilt movement)
 * **Python** (Core development language)
 * **Astropy** (Library for astronomical calculations)
-* **3D Printing** (Enclosures and structural parts)
+* **AutoDesk Fusion 360** (Enclosures and structural parts)
 
 This system is designed to be highly replicable at different scales.
 
