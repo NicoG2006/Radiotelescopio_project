@@ -97,5 +97,4 @@ The prototype's structural and mechanical components were fully designed and ani
 ### ⚙️ Mechanism & Actuators
 
 | Full Assembly | Drive System Detail |
-|:---:|
 | <img src="images/full_assembly.png" width="300" alt="Full assembly"> | 
