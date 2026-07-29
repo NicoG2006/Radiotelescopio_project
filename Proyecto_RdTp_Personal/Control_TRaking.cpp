@@ -1,10 +1,20 @@
 #include<ESP32Servo.h>
 #include<cmath>
+#include<WiFi.h>
+
+//Const for IP
+const char* name = "R_ESP_CONECTION";
+const char* pass = "Nico_2006";
+
+//Create server and client
+WiFiServer server(8080);
+WiFiClient client;
 
 int pinAz = 4;
 int pinAlt = 3;
 int pinV = 2;
 int pinVN = 1;
+int led = 5;
 //unsigned long lastTime = 0;
 double tolerance = 0.1;
 
@@ -53,7 +63,7 @@ class mountAxis{
     }
 
     double getMaxAngle(){
-      return maxAngle
+      return maxAngle;
     }
 };
 
@@ -73,18 +83,27 @@ struct deltaAngular{
 //Protoype function 
   //Astropy send coords -> ESP32-C3 mini get the coords
 Coordinates get_Coords();
+  //return an object client if client conected
+WiFiClient getClient();
   //Calculate angularError:
 void trackTarget();
+
 
 //Create the axis objects
 mountAxis azAxis(pinAz,0,180);
 mountAxis altAxis(pinAlt,30,150);
 
 void setup(){
-  Serial.begin(9600);//start serial comunication
+  Serial.begin(115200);//start serial comunication
+  WiFi.softAP(name, pass); //Set name and pass for local conection (Set esp as ACCSESS POINT)
+  server.begin(); //INIZIALITE server
   azAxis.begin(); //sart the axis motor Azimut
   altAxis.begin(); //sart the axis motor altitude
   pinMode(pinV, OUTPUT);
+  pinMode(led,OUTPUT);
+  //Print IP address for socket clients
+  Serial.print("IP address: ");
+  Serial.println(WiFi.softAPIP());
 }
 
 void loop(){  
@@ -95,28 +114,29 @@ void loop(){
 Coordinates get_Coords(){
   //Create a struct objetct data
   Coordinates target;
-  target.valid=false; //Inicializate valid bool 
+  target.valid=false; //Inicializate valid bool
+  client = getClient(); 
+  if(client.connected()){
+    if(client.available()){
+      String data = client.readStringUntil('\n');
+      int comma = data.indexOf(',');
 
-  if(Serial.available()>0){ //If available > 0 receive the data serial
-    
-    String data = Serial.readStringUntil('\n');
-    int comma = data.indexOf(',');
+      digitalWrite(pinV, HIGH);
+      digitalWrite(led,HIGH);
 
-    digitalWrite(pinV, HIGH);
+      if (comma != -1){
+        String azStr = data.substring(0, comma);
+        String altStr = data.substring(comma + 1);
 
-    if (comma != -1){
-      String azStr = data.substring(0, comma);
-      String altStr = data.substring(comma + 1);
+        target.az = azStr.toFloat();
+        target.alt = altStr.toFloat();
 
-      target.az = azStr.toFloat();
-      target.alt = altStr.toFloat();
-
-      target.valid = true;
+        target.valid = true;
+      }
+    } else {
+      digitalWrite(led, LOW);
     }
-  } else {
-    digitalWrite(pinV, LOW);
   }
-
   return target;
 }
 
@@ -150,4 +170,15 @@ void trackTarget(){
   }else{
     return;
   }
+}
+
+WiFiClient getClient(){
+  if (!client || !client.connected()) {
+    client = server.available();
+  }
+  if (client) {
+    Serial.println("Device connected!");
+  }
+
+  return client;
 }
