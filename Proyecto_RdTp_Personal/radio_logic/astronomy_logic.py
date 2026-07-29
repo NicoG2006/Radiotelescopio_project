@@ -1,8 +1,11 @@
 from astropy.coordinates import AltAz, SkyCoord, EarthLocation, get_sun
 from astropy.time import Time
 import astropy.units as u
-from radio_logic import serial_cmn as sc
+from radio_logic import comunication as cm
 import time as t
+from astropy.utils.iers import conf
+
+conf.auto_max_age = None
 
 def pedir_raDec():
     print("="*30)
@@ -37,7 +40,7 @@ def buscar_sol():
         print(f"REPORTE SOLAR")
         print(f"Hora UTC: {Time.now()}")
         print("=" * 30)
-        esp=sc.conectaresp()
+        esp=cm.conectaresp()
         while True:
             #Cada inicio de bucle debe actualizarce el tiempo por ende se deja acá dentro
             ahora = Time.now()
@@ -47,7 +50,7 @@ def buscar_sol():
             print(f"Elevación (Cuánto subir): {sol_pos.alt:.2f}")
             print("-" * 30)
             #Envía de inmediato datos de AzAlt en un solo viaje al esp32
-            sc.sendAzAlt(esp, sol_pos.az.deg, sol_pos.alt.deg)
+            cm.sendAzAlt(esp, sol_pos.az.deg, sol_pos.alt.deg)
             t.sleep(2) #Da espera de 2 segudnos para el próximo calculo      
     except KeyboardInterrupt: #En caso de que desee terminar rastreo hacer Keyinterrupt por ahora..
         print("Ha terminado el rastreo...")
@@ -67,7 +70,7 @@ def rastrear(name=None, ra=None, dec=None): #Parametros predeterminados en None
     print(f"Hora UTC: {Time.now()}")
     print("=" * 30)
     try:
-        esp=sc.conectaresp()
+        esp=cm.conectaresp()
         while True:
             tempo=Time.now() #actualiza tiempo cada inicio de bucle
             #Calculo de la posición en Ra y dec con respecto al tiempo del objeto ingresado por coordenadas
@@ -79,7 +82,7 @@ def rastrear(name=None, ra=None, dec=None): #Parametros predeterminados en None
             print(f"Azimut (Dónde girar): {position.az:.2f}")
             print(f"Elevación (Cuánto subir): {position.alt:.2f}")
             #Establece la comunicación serial de coordenadas en un solo viaje
-            sc.sendAzAlt(esp,position.az.deg,position.alt.deg)
+            cm.sendAzAlt(esp,position.az.deg,position.alt.deg)
             t.sleep(2) #da una espera de 2s
                     
     except KeyboardInterrupt: #Forma de terminar rastreo por ahora
