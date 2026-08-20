@@ -1,21 +1,82 @@
-import socket
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import Optional
+from radio_logic import astronomy_logic as astro
+from radio_logic import star_data as sd
 
-def conectaresp():
-    try:
-        #Intenta establecer comunicación con esp32 mediante un socket
-        #Create a socket
-        s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        s.connect(("192.168.4.1",8080)) 
-        print("Conexión establecida")    
-        return s
-    
-    except: #En caso de algún error inesperado
-        print("No se pudo establecer conexión, revise su red...")
-        return None
+app = FastAPI(title="RadioHunter || Nicolás García Parra")
 
-def sendAzAlt(esp: socket.socket,az, alt):
-    coords = f"{az:.2f},{alt:.2f}\n" #Prepera las coordenadas para ser procesadas y separadas en esp32
+class stuctCoord(BaseModel):
+    ra:float
+    dec:float
+
+current_angle = {
+    "az": 0.0,
+    "alt": 0.0,
+}
+
+@app.get("/greet")
+def greet():
     try:
-        esp.sendall(coords.encode('utf-8')) #Envia coordenadas
+        return{
+            "status" : "Server online",
+            "message" : "This server is ok"
+        }
     except Exception as e:
-        print(f"Error al enviar datos: {e}")
+        print(f"error:{e}")
+
+@app.post("/api/track/sun")
+def trackSun():
+    try:
+        az, alt = astro.buscar_sol()
+        current_angle["az"]=az
+        current_angle["alt"]=alt
+        return{
+            "status": "Upload target",
+            "Coords" : f"az:{az},alt:{alt}" 
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/track/object")
+def trackObject(coord:stuctCoord):
+    try:
+        az, alt = astro.rastrear(coord.ra, coord.dec)
+        current_angle["az"]=az
+        current_angle["alt"]=alt
+        return{
+            "status": "Upload target",
+            "Coords": f"az:{az},alt:{alt}"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/track/savedObj")
+def track_savedOBJ(name:str):
+    try:
+        coords= sd.buscar_obj(name)
+        if (coords)==None:
+            raise HTTPException(status_code=500, detail=str(f"{name} not exist on catalog"))
+        ra,dec = coords
+        az, alt = astro.rastrear(ra,dec)
+        current_angle["az"]=az
+        current_angle["alt"]=alt
+        return{
+            "Status": "Upload Target",
+            "Coords": f"az.{az},alt{alt}"
+        }
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/data/save")
+def save(name:str, ra:float, dec:float):
+    sd.guardar_obj(name, ra, dec)
+
+
+@app.get("/api/target")
+def getTarget():
+    return current_angle
