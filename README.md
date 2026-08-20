@@ -57,7 +57,7 @@ This section tracks the current progress and pending milestones of the project:
 #### Tracking Software (Python & Astropy) — **90%**
 <progress value="90" max="100"></progress>
 * **Completed:** Core astronomical tracking algorithms and coordinate calculations using Astropy are fully functional. 
-* **In Progress:** Transitioning the communication protocol from USB Serial to Wi-Fi for wireless data transmission to the microcontroller.
+* **In Progress:** Wi-Fi for wireless data transmission with fastAPI for controll.
 
 #### Microcontroller Firmware (ESP32-C3) — **In Progress**
 <progress value="50" max="100"></progress>
