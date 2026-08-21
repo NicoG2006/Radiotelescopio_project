@@ -1,184 +1,147 @@
-#include<ESP32Servo.h>
-#include<cmath>
-#include<WiFi.h>
+#include <ESP32Servo.h>
+#include <cmath>
+#include <WiFi.h>
+#include <HTTPClient.h> 
 
-//Const for IP
-const char* name = "R_ESP_CONECTION";
-const char* pass = "Nico_2006";
+// Constantes para millis()
+unsigned long previoMillis = 0;
+const long intervalo = 2000; 
 
-//Create server and client
-WiFiServer server(8080);
-WiFiClient client;
+// Credenciales para conectarte al Wi-Fi
+const char* ssid = "DCore_Explorer1";
+const char* pass = "1109666330";
+
+// Cliente HTTP global
+HTTPClient http;
 
 int pinAz = 4;
 int pinAlt = 3;
 int pinV = 2;
 int pinVN = 1;
 int led = 5;
-//unsigned long lastTime = 0;
+
 double tolerance = 0.1;
 
-//Class for each axis motor
-class mountAxis{
+// Clase para motores
+class mountAxis {
   private:
-  //atributes class
-    Servo servo; //For this prototype use a servo
-    int pin; //Pin for Motor
+    Servo servo;
+    int pin;
     double minAngle;
     double maxAngle;
     double currentAngle;
-  public: 
-    mountAxis(int p, double mnA, double mxA) //inicialite the atributes
-    :
-      pin(p),
-      minAngle(mnA),
-      maxAngle(mxA),
-      currentAngle(mnA)
-    {}
 
-    void begin(){ //start the motor from begin -> motor's setup
+  public: 
+    mountAxis(int p, double mnA, double mxA) : pin(p), minAngle(mnA), maxAngle(mxA), currentAngle(mnA) {}
+
+    void begin() {
       servo.setPeriodHertz(50);
-      servo.attach(pin, 1000,2000);
+      servo.attach(pin, 1000, 2000);
       servo.write(round(minAngle));
       currentAngle = minAngle;
     }
 
-    void moveTo(double mvt){ //Move the motor order
-      if(mvt<minAngle){
-        mvt=minAngle;
-      }
-      if(mvt>maxAngle){
-        mvt=maxAngle;
-      }
+    void moveTo(double mvt) {
+      if (mvt < minAngle) mvt = minAngle;
+      if (mvt > maxAngle) mvt = maxAngle;
       servo.write(round(mvt));
-      currentAngle=mvt;
+      currentAngle = mvt;
     }
 
-    double getPosition() const{ //Get the last position
-      return currentAngle;
-    }
-
-    double getMinAngle(){
-      return minAngle;
-    }
-
-    double getMaxAngle(){
-      return maxAngle;
-    }
+    double getPosition() const { return currentAngle; }
+    double getMinAngle() const { return minAngle; }
+    double getMaxAngle() const { return maxAngle; }
 };
 
-//Struct coords azAlt
-struct Coordinates{
-  double az;
-  double alt;
-  bool valid;
+// Estructura  8 bytes para recibir az y alt
+struct Coordinates {
+  float az;
+  float alt;
 };
 
-//Struct for angular diference on Azimut or Altitude
-struct deltaAngular{
-  double az;
-  double alt;
+struct deltaAngular {
+  float az;
+  float alt;
 };
 
-//Protoype function 
-  //Astropy send coords -> ESP32-C3 mini get the coords
-Coordinates get_Coords();
-  //return an object client if client conected
-WiFiClient getClient();
-  //Calculate angularError:
+// Prototipos de funciones
+bool get_Coords(Coordinates &dataOut); 
 void trackTarget();
 
+// Crear objetos de motores
+mountAxis azAxis(pinAz, 0, 180);
+mountAxis altAxis(pinAlt, 0, 150);
 
-//Create the axis objects
-mountAxis azAxis(pinAz,0,180);
-mountAxis altAxis(pinAlt,30,150);
+void setup() {
+  Serial.begin(115200);
 
-void setup(){
-  Serial.begin(115200);//start serial comunication
-  WiFi.softAP(name, pass); //Set name and pass for local conection (Set esp as ACCSESS POINT)
-  server.begin(); //INIZIALITE server
-  azAxis.begin(); //sart the axis motor Azimut
-  altAxis.begin(); //sart the axis motor altitude
-  pinMode(pinV, OUTPUT);
-  pinMode(led,OUTPUT);
-  //Print IP address for socket clients
-  Serial.print("IP address: ");
+  // 1. Configuramos el ESP32 como Access Point (Red propia)
+  WiFi.softAP(ssid, pass);
+
+  // 2. Imprimimos la IP del ESP32 (Suele ser 192.168.4.1)
+  Serial.print("Red AP Creada: ");
+  Serial.println(ssid);
+  Serial.print("IP del ESP32 (Gateway): ");
   Serial.println(WiFi.softAPIP());
+
+  azAxis.begin();
+  altAxis.begin();
+
+  pinMode(pinV, OUTPUT);
+  pinMode(led, OUTPUT);
 }
+void loop() {
+  unsigned long actualMillis = millis();
 
-void loop(){  
-  trackTarget();
-}
-
-//Build the get function
-Coordinates get_Coords(){
-  //Create a struct objetct data
-  Coordinates target;
-  target.valid=false; //Inicializate valid bool
-  client = getClient(); 
-  if(client.connected()){
-    if(client.available()){
-      String data = client.readStringUntil('\n');
-      int comma = data.indexOf(',');
-
-      digitalWrite(pinV, HIGH);
-      digitalWrite(led,HIGH);
-
-      if (comma != -1){
-        String azStr = data.substring(0, comma);
-        String altStr = data.substring(comma + 1);
-
-        target.az = azStr.toFloat();
-        target.alt = altStr.toFloat();
-
-        target.valid = true;
-      }
-    } else {
-      digitalWrite(led, LOW);
-    }
+  // Ejecuta la petición y rastreo cada 2 segundos sin congelar el ESP32
+  if (actualMillis - previoMillis >= intervalo) { // Corregido: previoMillis
+    previoMillis = actualMillis;
+    trackTarget(); 
   }
-  return target;
 }
 
-void trackTarget(){
-  Coordinates target = get_Coords();
+// Función que pide las coordenadas y devuelve true/false según el éxito
+bool get_Coords(Coordinates &dataOut) {
+  http.begin("http://192.168.4.2:8000/api/target");
+  int httpCode = http.GET();
+  bool verify = false; // Corregido: false
+  
+  if (httpCode == HTTP_CODE_OK) {
+    WiFiClient* stream = http.getStreamPtr();
+    if (stream->available() >= sizeof(Coordinates)) {
+      // Corregido: uint8_t* en lugar de uint_8*
+      stream->readBytes((uint8_t*)&dataOut, sizeof(Coordinates)); 
+      verify = true;
+    }
+  } else {
+    Serial.print("Error HTTP: ");
+    Serial.println(httpCode);
+  }
+
+  http.end(); // Siempre se libera el socket al terminar
+  return verify;
+}
+
+void trackTarget() {
+  Coordinates target;
   deltaAngular delta;
   
-  //Calculate delta angular for exactly position, and the actually position 
-  if (target.valid){
+  // Corregido: llamada consistente a get_Coords
+  if (get_Coords(target)) { 
 
-    delta.az = abs(target.az - azAxis.getPosition()); //Diference angular position on azimuth magnitude
-    delta.alt = abs(target.alt - altAxis.getPosition()); //Diference angular position on Altitude magnitude
+    delta.az = abs(target.az - azAxis.getPosition());
+    delta.alt = abs(target.alt - altAxis.getPosition());
   
-    //If delta angular superate the tolerance, the axis AZ need move to the new position
-    if(delta.az >=tolerance){ 
-
+    if (delta.az >= tolerance) { 
       azAxis.moveTo(target.az);
-
     }
 
-    //If delta angular superate the tolerance, the axis ALT need move to the new position
-    if(delta.alt >= tolerance){
-      //If coords outs range dont move the AltAxis
-      if(target.alt < altAxis.getMinAngle()  || target.alt > altAxis.getMaxAngle()){
-        Serial.print("Objeto no rastreable");
-      }else{
+    if (delta.alt >= tolerance) {
+      if (target.alt < altAxis.getMinAngle() || target.alt > altAxis.getMaxAngle()) {
+        Serial.println("Objeto no rastreable (fuera de rango)");
+      } else {
         altAxis.moveTo(target.alt);
-      }  
-
+      }   
     }
-  }else{
-    return;
   }
-}
-
-WiFiClient getClient(){
-  if (!client || !client.connected()) {
-    client = server.available();
-  }
-  if (client) {
-    Serial.println("Device connected!");
-  }
-
-  return client;
 }
